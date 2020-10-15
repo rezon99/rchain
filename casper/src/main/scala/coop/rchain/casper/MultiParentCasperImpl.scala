@@ -539,9 +539,14 @@ class MultiParentCasperImpl[F[_]: Sync: Concurrent: Log: Time: SafetyOracle: Las
                              }
                            }
       depsInEqTracker = allDeps.filter(equivocationHashes.contains)
+      depsInCasper <- allDeps.filterA(
+                       d =>
+                         blockProcessingState.get
+                           .map(s => s.processing.contains(d) || s.enqueued.contains(d))
+                     )
 
       missingDeps = allDeps filterNot (
-          d => depsInDag.contains(d) || depsInBuffer.contains(d) || depsInEqTracker.contains(d)
+          d => (depsInDag ++ depsInBuffer ++ depsInEqTracker ++ depsInCasper).contains(d)
       )
       _ <- (missingDeps ++ depsInBuffer).traverse(casperBuffer.addRelation(_, b.blockHash))
       _ <- BlockRetriever[F].ackInCasper(b.blockHash)
